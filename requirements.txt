@@ -1,0 +1,6 @@
+requests
+msal
+python-dotenv
+Pillow
+pyodbc
+openpyxl
