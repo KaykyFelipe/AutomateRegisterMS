@@ -71,6 +71,14 @@ def criar_assinatura(nome_param=None, cargo_param=None, filial_param=None, local
     if filial == '9':
         local = local_param if local_param is not None else input("Qual local da filial? (Ex: São Paulo/SP) ").strip()
         telefone_filial = telefone_filial_param if telefone_filial_param is not None else input("Qual telefone da filial? (Pressione ENTER para pular) ").strip()
+        
+        # Look up the telephone if it was not provided but local matches
+        if not telefone_filial:
+            for key, val in filiais.items():
+                if val['local'] == local:
+                    telefone_filial = val['telefone']
+                    break
+
         email_manual = email_manual_param if email_manual_param is not None else input("Qual e-mail? (Pressione ENTER para usar email padrão) ").strip()
         if '/' in local:
             cidade, uf = local.split('/', 1)
