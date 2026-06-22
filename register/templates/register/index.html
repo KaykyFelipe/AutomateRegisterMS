@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ativa Locação - Automação MS365</title>
+    <!-- CSS Customizado -->
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="background-animation">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+    </div>
+
+    <main class="glass-container">
+        <header class="header">
+            <h1>Onboarding Digital</h1>
+            <p>Automação de criação de contas Microsoft 365 e assinaturas.</p>
+        </header>
+
+        <section id="step-1" class="step active">
+            <h2>1. Busca no Protheus</h2>
+            <form id="search-form">
+                <div class="form-group">
+                    <label for="matricula">Matrícula (Ex: 000282)</label>
+                    <input type="text" id="matricula" name="matricula" placeholder="Digite a matrícula" required>
+                </div>
+                <div class="form-group">
+                    <label for="filial">Filial (Ex: 001001)</label>
+                    <input type="text" id="filial" name="filial" placeholder="Digite a filial no Protheus" required>
+                </div>
+                <button type="submit" class="btn primary-btn" id="btn-search">
+                    <span class="btn-text">Buscar Colaborador</span>
+                    <span class="loader hidden"></span>
+                </button>
+            </form>
+            <div id="search-error" class="error-msg hidden"></div>
+        </section>
+
+        <section id="step-2" class="step hidden">
+            <h2>2. Dados Complementares</h2>
+            <div class="emp-card">
+                <p><strong>Colaborador:</strong> <span id="lbl-name"></span></p>
+                <p><strong>Admissão:</strong> <span id="lbl-admissao"></span></p>
+            </div>
+            
+            <form id="create-form">
+                <div class="form-group">
+                    <label for="cargo">Cargo</label>
+                    <input type="text" id="cargo" name="cargo" placeholder="Ex: Especialista de Sistemas" required>
+                </div>
+                <div class="form-group">
+                    <label for="local">Local da Filial</label>
+                    <select id="local" name="local" required>
+                        <option value="Matriz/SP">1 - Matriz/SP</option>
+                        <option value="Cuiabá/MT">2 - Cuiabá/MT</option>
+                        <option value="Uberlândia/MG">3 - Uberlândia/MG</option>
+                        <option value="Limeira/SP">4 - Limeira/SP</option>
+                        <option value="Campo Grande/MS">5 - Campo Grande/MS</option>
+                        <option value="Araçatuba/SP">6 - Araçatuba/SP</option>
+                        <option value="Londrina/PR">7 - Londrina/PR</option>
+                        <option value="Ribeirão Preto/SP">8 - Ribeirão Preto/SP</option>
+                        <option value="Outro">9 - Outro / Personalizado</option>
+                    </select>
+                </div>
+                <div class="form-group hidden" id="custom-local-group">
+                    <label for="custom_local">Local Personalizado</label>
+                    <input type="text" id="custom_local" name="custom_local" placeholder="Ex: São Paulo/SP">
+                </div>
+                
+                <div class="row">
+                    <div class="form-group half">
+                        <label for="telefone">Telefone (Opcional)</label>
+                        <input type="text" id="telefone" name="telefone" placeholder="(11) 99999-9999">
+                    </div>
+                    <div class="form-group half">
+                        <label for="ramal">Ramal (Opcional)</label>
+                        <input type="text" id="ramal" name="ramal" placeholder="1234">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="username">Usuário (Sugestão)</label>
+                    <input type="text" id="username" name="username" placeholder="joao.silva">
+                    <small>Você pode alterar a sugestão antes de criar.</small>
+                </div>
+
+                <div class="actions">
+                    <button type="button" class="btn secondary-btn" id="btn-back">Voltar</button>
+                    <button type="submit" class="btn primary-btn" id="btn-create">
+                        <span class="btn-text">Criar Conta M365</span>
+                        <span class="loader hidden"></span>
+                    </button>
+                </div>
+            </form>
+            <div id="create-error" class="error-msg hidden"></div>
+        </section>
+
+        <section id="step-3" class="step hidden">
+            <div class="success-card">
+                <div class="success-icon">✓</div>
+                <h2>Criação Concluída!</h2>
+                <p>O usuário foi criado e as credenciais foram gravadas no SharePoint.</p>
+                
+                <div class="credentials">
+                    <div class="cred-item">
+                        <span class="label">E-mail M365</span>
+                        <span class="value" id="res-email">joao.silva@ativalocacao.com.br</span>
+                    </div>
+                    <div class="cred-item">
+                        <span class="label">Senha Temporária</span>
+                        <span class="value" id="res-password">SenhaForte123!</span>
+                    </div>
+                    <div class="cred-item">
+                        <span class="label">Usuário VPN</span>
+                        <span class="value" id="res-vpn">atv.joao.silva</span>
+                    </div>
+                </div>
+
+                <div class="signature-preview">
+                    <h3>Assinatura Gerada</h3>
+                    <img id="res-signature-img" src="" alt="Assinatura">
+                    <a id="btn-download" href="#" download="assinatura.png" class="btn primary-btn">Baixar Assinatura</a>
+                </div>
+
+                <button class="btn secondary-btn" id="btn-restart" style="margin-top: 2rem;">Criar Novo Usuário</button>
+            </div>
+        </section>
+    </main>
+
+    <!-- JS Customizado -->
+    <script src="{% static 'js/app.js' %}"></script>
+</body>
+</html>
