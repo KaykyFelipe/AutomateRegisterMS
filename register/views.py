@@ -128,3 +128,63 @@ def create_user(request):
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
     return JsonResponse({'error': 'Método não permitido.'}, status=405)
+
+@csrf_exempt
+def backup_onedrive(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            source_email = data.get('source_email')
+            dest_email = data.get('dest_email')
+            
+            if not source_email or not dest_email:
+                return JsonResponse({'error': 'E-mail de origem e destino são obrigatórios.'}, status=400)
+                
+            token = utils.get_access_token()
+            success, message, monitor_urls = utils.copy_onedrive_items(token, source_email, dest_email)
+            
+            if success:
+                return JsonResponse({'success': True, 'message': message, 'monitor_urls': monitor_urls})
+            else:
+                return JsonResponse({'success': False, 'message': message}, status=500)
+                
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse({'error': 'Método não permitido.'}, status=405)
+
+@csrf_exempt
+def check_backup_progress(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            monitor_urls = data.get('monitor_urls', [])
+            
+            token = utils.get_access_token()
+            percentage = utils.check_backup_status(token, monitor_urls)
+            return JsonResponse({'success': True, 'percentage': percentage})
+                
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse({'error': 'Método não permitido.'}, status=405)
+
+@csrf_exempt
+def remove_license(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            source_email = data.get('source_email')
+            
+            if not source_email:
+                return JsonResponse({'error': 'E-mail é obrigatório.'}, status=400)
+                
+            token = utils.get_access_token()
+            success, message = utils.remove_all_licenses(token, source_email)
+            
+            if success:
+                return JsonResponse({'success': True, 'message': message})
+            else:
+                return JsonResponse({'success': False, 'message': message}, status=500)
+                
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse({'error': 'Método não permitido.'}, status=405)

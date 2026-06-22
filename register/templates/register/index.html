@@ -19,10 +19,16 @@
 
     <main class="glass-container">
         <header class="header">
-            <h1>Onboarding Digital</h1>
-            <p>Automação de criação de contas Microsoft 365 e assinaturas.</p>
+            <h1>Automação Microsoft 365</h1>
+            <p>Selecione a funcionalidade desejada no menu abaixo.</p>
         </header>
 
+        <div class="menu-tabs" style="display: flex; gap: 10px; margin-bottom: 20px;">
+            <button class="tab-btn active" data-target="onboarding-flow" style="padding: 10px 20px; cursor: pointer; border: none; border-radius: 8px; background: var(--primary-color); color: white; font-weight: 600;">Criar Conta Microsoft</button>
+            <button class="tab-btn" data-target="backup-flow" style="padding: 10px 20px; cursor: pointer; border: 1px solid var(--border-color); border-radius: 8px; background: transparent; color: var(--text-color); font-weight: 600;">Backup Microsoft</button>
+        </div>
+
+        <div id="onboarding-flow" class="flow-container active">
         <section id="step-1" class="step active">
             <h2>1. Busca no Protheus</h2>
             <form id="search-form">
@@ -131,6 +137,43 @@
                 <button class="btn secondary-btn" id="btn-restart" style="margin-top: 2rem;">Criar Novo Usuário</button>
             </div>
         </section>
+        </div> <!-- Fim onboarding-flow -->
+
+        <div id="backup-flow" class="flow-container" style="display: none;">
+            <section class="step active">
+                <h2>Backup de OneDrive</h2>
+                <form id="backup-form">
+                    <div class="form-group">
+                        <label for="source_email">E-mail do Colaborador Desligado (Origem)</label>
+                        <input type="email" id="source_email" name="source_email" placeholder="ex: joao.silva@ativalocacao.com.br" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="dest_email">E-mail de Destino</label>
+                        <input type="email" id="dest_email" name="dest_email" placeholder="ex: gestor@ativalocacao.com.br" required>
+                    </div>
+                    <button type="submit" class="btn primary-btn" id="btn-backup">
+                        <span class="btn-text">Iniciar Backup</span>
+                        <span class="loader hidden"></span>
+                    </button>
+                </form>
+                <div id="backup-msg" class="msg-box hidden" style="margin-top: 1rem; padding: 1rem; border-radius: 8px;"></div>
+                
+                <div id="progress-container" class="hidden" style="margin-top: 1rem; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; height: 30px; position: relative;">
+                    <div id="progress-bar" style="width: 0%; height: 100%; background: var(--primary-color); transition: width 0.3s ease;"></div>
+                    <div id="progress-text" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: var(--text-color); mix-blend-mode: difference;">0%</div>
+                </div>
+
+                <div id="post-backup-actions" class="hidden" style="margin-top: 2rem; padding: 1.5rem; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); border-radius: 8px; text-align: center;">
+                    <h3>Deseja remover a licença Microsoft do usuário?</h3>
+                    <p style="margin-bottom: 1rem; font-size: 0.9rem; opacity: 0.8;">Isso removerá a licença Business Basic da conta de origem para liberar a licença para outro colaborador.</p>
+                    <div style="display: flex; gap: 10px; justify-content: center;">
+                        <button type="button" id="btn-remove-license-yes" class="btn primary-btn" style="background: #E74C3C;">Sim, remover</button>
+                        <button type="button" id="btn-remove-license-no" class="btn secondary-btn">Não</button>
+                    </div>
+                    <div id="license-msg" class="msg-box hidden" style="margin-top: 1rem;"></div>
+                </div>
+            </section>
+        </div>
     </main>
 
     <!-- JS Customizado -->

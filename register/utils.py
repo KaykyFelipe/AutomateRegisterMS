@@ -196,3 +196,195 @@ def save_to_excel_sp(access_token, admissao, matricula, filial, nome, vpn_user, 
             
     except Exception as e:
         return False, f"Erro ao comunicar com SP: {e}"
+
+def get_user_info(access_token, user_email):
+    """Busca as informações do usuário no Graph API."""
+    if access_token == "mock_token":
+        return {"displayName": "Mock User"}
+    headers = {"Authorization": f"Bearer {access_token}"}
+    res = requests.get(f"https://graph.microsoft.com/v1.0/users/{user_email}", headers=headers)
+    if res.status_code == 200:
+        return res.json()
+    else:
+        raise Exception(f"Erro ao buscar info do usuário {user_email}: {res.text}")
+
+def get_or_create_folder(access_token, user_email, folder_name, parent_id="root"):
+    """Retorna o ID da pasta. Cria se não existir."""
+    if access_token == "mock_token":
+        return "mock_folder_id"
+        
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+    
+    # 1. Tentar obter a pasta existente
+    if parent_id == "root":
+        path_url = f"https://graph.microsoft.com/v1.0/users/{user_email}/drive/root:/{folder_name}"
+    else:
+        path_url = f"https://graph.microsoft.com/v1.0/users/{user_email}/drive/items/{parent_id}:/{folder_name}"
+        
+    res = requests.get(path_url, headers=headers)
+    if res.status_code == 200:
+        return res.json().get("id")
+        
+    # 2. Se não existir (404), criar a pasta
+    if parent_id == "root":
+        create_url = f"https://graph.microsoft.com/v1.0/users/{user_email}/drive/root/children"
+    else:
+        create_url = f"https://graph.microsoft.com/v1.0/users/{user_email}/drive/items/{parent_id}/children"
+        
+    payload = {
+        "name": folder_name,
+        "folder": {},
+        "@microsoft.graph.conflictBehavior": "rename"
+    }
+    res_create = requests.post(create_url, headers=headers, json=payload)
+    if res_create.status_code in [200, 201]:
+        return res_create.json().get("id")
+    else:
+        raise Exception(f"Erro ao criar pasta {folder_name} para {user_email}: {res_create.text}")
+
+def copy_onedrive_items(access_token, source_email, dest_email):
+    """Copia todos os itens da raiz do source_email para uma pasta de backup no dest_email."""
+    if access_token == "mock_token":
+        return True, "Mock: Cópia iniciada com sucesso."
+
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+
+    try:
+        # 1. Pega informações do usuário de origem para nomear a pasta
+        source_info = get_user_info(access_token, source_email)
+        display_name = source_info.get("displayName", source_email.split("@")[0])
+        safe_name = "".join([c if c.isalnum() or c in " .-_" else "_" for c in display_name]).strip()
+        
+        # 2. Obter o driveId do destino
+        dest_drive_res = requests.get(f"https://graph.microsoft.com/v1.0/users/{dest_email}/drive", headers=headers)
+        if dest_drive_res.status_code != 200:
+            return False, f"Erro ao buscar Drive do destino: {dest_drive_res.text}"
+        dest_drive_id = dest_drive_res.json().get("id")
+
+        # 3. Criar a pasta 'Backups' na raiz do destino
+        backups_folder_id = get_or_create_folder(access_token, dest_email, "Backups", parent_id="root")
+
+        # 4. Criar a pasta do usuário desligado dentro de 'Backups'
+        user_backup_folder_id = get_or_create_folder(access_token, dest_email, safe_name, parent_id=backups_folder_id)
+
+        # 5. Listar arquivos e pastas na raiz do usuário de origem
+        source_items_url = f"https://graph.microsoft.com/v1.0/users/{source_email}/drive/root/children"
+        res_items = requests.get(source_items_url, headers=headers)
+        if res_items.status_code != 200:
+            return False, f"Erro ao listar itens da origem: {res_items.text}"
+            
+        items = res_items.json().get("value", [])
+        if not items:
+            return True, "O OneDrive de origem está vazio. Nenhuma cópia necessária."
+            
+        # 6. Para cada item, enviar comando de copy
+        monitor_urls = []
+        for item in items:
+            item_id = item.get("id")
+            copy_url = f"https://graph.microsoft.com/v1.0/users/{source_email}/drive/items/{item_id}/copy"
+            copy_payload = {
+                "parentReference": {
+                    "driveId": dest_drive_id,
+                    "id": user_backup_folder_id
+                }
+            }
+            res_copy = requests.post(copy_url, headers=headers, json=copy_payload)
+            if res_copy.status_code in [200, 201, 202]:
+                loc = res_copy.headers.get("Location")
+                if loc:
+                    monitor_urls.append(loc)
+
+        return True, f"Comandos de cópia enviados com sucesso para a pasta Backups/{safe_name}.", monitor_urls
+
+    except Exception as e:
+        return False, str(e), []
+
+def check_backup_status(access_token, monitor_urls):
+    """Consulta o status atual das URLs de monitoramento de cópia."""
+    if not monitor_urls:
+        return 100.0
+
+    if access_token == "mock_token":
+        return 100.0
+
+    headers = {"Authorization": f"Bearer {access_token}"}
+    total_percentage = 0.0
+
+    for url in monitor_urls:
+        try:
+            # allow_redirects=False é crucial: se concluir, a API retorna 303 See Other
+            res = requests.get(url, headers=headers, allow_redirects=False)
+            print(f"Monitor URL GET: {url}")
+            print(f"Status Code: {res.status_code}")
+            
+            if res.status_code == 200:
+                data = res.json()
+                print(f"Data 200: {data}")
+                pct = data.get("percentageComplete", 0)
+                status = data.get("status", "inProgress")
+                if status == "completed":
+                    pct = 100.0
+                total_percentage += pct
+            elif res.status_code in [303, 201]:
+                # 303 See Other significa que terminou com sucesso e redireciona pro novo item
+                total_percentage += 100.0
+            else:
+                print(f"Erro/Status inesperado: {res.status_code} - {res.text}")
+                # Se deu erro temporário (ex: 401, 500) não assumimos 100%, 
+                # vamos somar 0% ou logar. Se falhar sempre, pode travar, 
+                # então podemos checar se foi 404 (expirou/não achou).
+                if res.status_code == 404:
+                    total_percentage += 100.0
+                else:
+                    # Em outros erros (como 401), não sabemos o status. 
+                    # Assumimos 0% para não finalizar antes da hora.
+                    total_percentage += 0.0
+        except Exception as e:
+            # Erro de conexão, etc. Assume 0% para não encerrar prematuramente
+            total_percentage += 0.0
+
+    avg_percentage = total_percentage / len(monitor_urls)
+    return avg_percentage
+
+def remove_all_licenses(access_token, user_email):
+    """Remove todas as licenças Microsoft 365 de um usuário."""
+    if access_token == "mock_token":
+        return True, "Mock: Licenças removidas com sucesso."
+        
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+    
+    try:
+        # 1. Obter quais licenças estão atribuídas
+        res = requests.get(f"https://graph.microsoft.com/v1.0/users/{user_email}/licenseDetails", headers=headers)
+        if res.status_code != 200:
+            return False, f"Erro ao buscar licenças: {res.text}"
+            
+        license_details = res.json().get("value", [])
+        if not license_details:
+            return True, "O usuário já não possui nenhuma licença."
+            
+        skus_to_remove = [item.get("skuId") for item in license_details]
+        
+        # 2. Remover licenças
+        license_data = {
+            "addLicenses": [],
+            "removeLicenses": skus_to_remove
+        }
+        
+        res_remove = requests.post(f"https://graph.microsoft.com/v1.0/users/{user_email}/assignLicense", headers=headers, json=license_data)
+        if res_remove.status_code == 200:
+            return True, "Licença removida com sucesso."
+        else:
+            return False, f"Erro ao remover licença: {res_remove.text}"
+            
+    except Exception as e:
+        return False, str(e)

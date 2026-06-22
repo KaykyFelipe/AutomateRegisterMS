@@ -336,3 +336,8 @@ a.btn {
     text-decoration: none;
     display: inline-flex;
 }
+
+/* Classe utilitária global para esconder elementos */
+.hidden {
+    display: none !important;
+}
