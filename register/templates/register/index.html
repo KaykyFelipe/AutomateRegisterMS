@@ -4,29 +4,44 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ativa Locação - Automação MS365</title>
-    <!-- CSS Customizado -->
+    <!-- CSS Customizado com Cache Buster -->
     {% load static %}
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=1.1">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="background-animation">
-        <div class="blob blob-1"></div>
-        <div class="blob blob-2"></div>
-    </div>
+    <!-- Menu Lateral Fixo -->
+    <nav class="sidebar-menu">
+        <div class="sidebar-header">
+            <img src="{% static 'img/logo.png' %}" alt="Ativa Locação Logo" style="max-width: 150px; display: block; margin: 0 auto 10px;">
+            <h2 style="text-align: center;">Automações T.I</h2>
+        </div>
+        <button class="tab-btn active" data-target="onboarding-flow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>
+            Criar Conta MS
+        </button>
+        <button class="tab-btn" data-target="backup-flow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            Backup OneDrive
+        </button>
+        <button class="tab-btn" data-target="outlook-flow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+            Backup Outlook
+        </button>
+        <button class="tab-btn" data-target="signature-flow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            Gerar Assinatura
+        </button>
+    </nav>
 
     <main class="glass-container">
         <header class="header">
+            <img src="{% static 'img/logo.png' %}" alt="Logo" style="max-height: 80px; margin-bottom: 15px; display: inline-block;">
             <h1>Automação Microsoft 365</h1>
-            <p>Selecione a funcionalidade desejada no menu abaixo.</p>
+            <p>Siga os passos abaixo para completar o processo.</p>
         </header>
-
-        <div class="menu-tabs" style="display: flex; gap: 10px; margin-bottom: 20px;">
-            <button class="tab-btn active" data-target="onboarding-flow" style="padding: 10px 20px; cursor: pointer; border: none; border-radius: 8px; background: var(--primary-color); color: white; font-weight: 600;">Criar Conta Microsoft</button>
-            <button class="tab-btn" data-target="backup-flow" style="padding: 10px 20px; cursor: pointer; border: 1px solid var(--border-color); border-radius: 8px; background: transparent; color: var(--text-color); font-weight: 600;">Backup Microsoft</button>
-        </div>
 
         <div id="onboarding-flow" class="flow-container active">
         <section id="step-1" class="step active">
@@ -151,10 +166,13 @@
                         <label for="dest_email">E-mail de Destino</label>
                         <input type="email" id="dest_email" name="dest_email" placeholder="ex: gestor@ativalocacao.com.br" required>
                     </div>
-                    <button type="submit" class="btn primary-btn" id="btn-backup">
-                        <span class="btn-text">Iniciar Backup</span>
-                        <span class="loader hidden"></span>
-                    </button>
+
+                    <div class="actions">
+                        <button type="submit" class="btn primary-btn" id="btn-backup">
+                            <span class="btn-text">Iniciar Backup</span>
+                            <div class="loader hidden" id="backup-loader"></div>
+                        </button>
+                    </div>
                 </form>
                 <div id="backup-msg" class="msg-box hidden" style="margin-top: 1rem; padding: 1rem; border-radius: 8px;"></div>
                 
@@ -174,9 +192,102 @@
                 </div>
             </section>
         </div>
+
+        <div id="outlook-flow" class="flow-container" style="display: none;">
+            <section class="step active">
+                <h2>Backup de E-mails (Outlook)</h2>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">Exporta os e-mails recentes em formato .eml para o OneDrive de destino.</p>
+                <form id="outlook-form">
+                    <div class="form-group">
+                        <label for="source-email-out">E-mail do Colaborador Desligado (Origem)</label>
+                        <input type="email" id="source-email-out" name="source-email-out" placeholder="ex: joao.silva@ativalocacao.com.br" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="dest-email-out">E-mail de Destino (Recebedor)</label>
+                        <input type="email" id="dest-email-out" name="dest-email-out" placeholder="ex: gestor@ativalocacao.com.br" required>
+                    </div>
+
+                    <div class="actions">
+                        <button type="submit" class="btn primary-btn" id="btn-outlook">
+                            <span class="btn-text">Iniciar Exportação</span>
+                            <div class="loader hidden" id="outlook-loader"></div>
+                        </button>
+                    </div>
+                </form>
+                <div id="outlook-msg" class="msg-box hidden" style="margin-top: 1rem; padding: 1rem; border-radius: 8px;"></div>
+            </section>
+        </div>
+
+        <div id="signature-flow" class="flow-container" style="display: none;">
+            <section class="step active">
+                <h2>Gerador de Assinatura</h2>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">Gere uma assinatura de e-mail personalizada sem criar conta no Microsoft 365.</p>
+                <form id="signature-form">
+                    <div class="form-group">
+                        <label for="sig-name">Nome Completo</label>
+                        <input type="text" id="sig-name" name="sig-name" placeholder="Ex: OSMAR APARECIDO BISSOLI" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="sig-cargo">Cargo</label>
+                        <input type="text" id="sig-cargo" name="sig-cargo" placeholder="Ex: Especialista de Sistemas">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="sig-local">Local da Filial</label>
+                        <select id="sig-local" name="sig-local" required>
+                            <option value="Matriz/SP">1 - Matriz/SP</option>
+                            <option value="Cuiabá/MT">2 - Cuiabá/MT</option>
+                            <option value="Uberlândia/MG">3 - Uberlândia/MG</option>
+                            <option value="Limeira/SP">4 - Limeira/SP</option>
+                            <option value="Campo Grande/MS">5 - Campo Grande/MS</option>
+                            <option value="Araçatuba/SP">6 - Araçatuba/SP</option>
+                            <option value="Londrina/PR">7 - Londrina/PR</option>
+                            <option value="Ribeirão Preto/SP">8 - Ribeirão Preto/SP</option>
+                            <option value="Outro">9 - Outro / Personalizado</option>
+                        </select>
+                    </div>
+                    <div class="form-group hidden" id="sig-custom-local-group">
+                        <label for="sig-custom-local">Local Personalizado</label>
+                        <input type="text" id="sig-custom-local" name="sig-custom-local" placeholder="Ex: São Paulo/SP">
+                    </div>
+
+                    <div class="row">
+                        <div class="form-group half">
+                            <label for="sig-telefone">Telefone (Opcional)</label>
+                            <input type="text" id="sig-telefone" name="sig-telefone" placeholder="(11) 99999-9999">
+                        </div>
+                        <div class="form-group half">
+                            <label for="sig-ramal">Ramal (Opcional)</label>
+                            <input type="text" id="sig-ramal" name="sig-ramal" placeholder="1234">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="sig-email">E-mail (Opcional)</label>
+                        <input type="email" id="sig-email" name="sig-email" placeholder="Para forçar um e-mail diferente na assinatura">
+                    </div>
+
+                    <div class="actions">
+                        <button type="submit" class="btn primary-btn" id="btn-signature">
+                            <span class="btn-text">Gerar Assinatura</span>
+                            <div class="loader hidden" id="signature-loader"></div>
+                        </button>
+                    </div>
+                </form>
+                <div id="signature-msg" class="msg-box hidden" style="margin-top: 1rem; padding: 1rem; border-radius: 8px;"></div>
+                <div id="signature-result" class="hidden" style="margin-top: 1.5rem; text-align: center; background: rgba(255, 255, 255, 0.05); padding: 1.5rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                    <p style="margin-bottom: 1rem; font-weight: bold; color: var(--text-main);">Assinatura Gerada:</p>
+                    <img id="signature-image" src="" alt="Assinatura" style="max-width: 100%; border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <div style="margin-top: 1rem;">
+                        <a id="btn-download-signature" href="#" download="assinatura.png" class="btn secondary-btn" style="display: inline-block;">Baixar Imagem</a>
+                    </div>
+                </div>
+            </section>
+        </div>
+
     </main>
 
-    <!-- JS Customizado -->
-    <script src="{% static 'js/app.js' %}"></script>
+    <!-- JS Customizado com Cache Buster -->
+    <script src="{% static 'js/app.js' %}?v=1.1"></script>
 </body>
 </html>

@@ -188,3 +188,83 @@ def remove_license(request):
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
     return JsonResponse({'error': 'Método não permitido.'}, status=405)
+
+@csrf_exempt
+def backup_outlook(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            source_email = data.get('source_email')
+            dest_email = data.get('dest_email')
+            
+            if not source_email or not dest_email:
+                return JsonResponse({'error': 'E-mail de origem e destino são obrigatórios.'}, status=400)
+                
+            token = utils.get_access_token()
+            success, message = utils.backup_outlook_to_onedrive(token, source_email, dest_email)
+            
+            if success:
+                return JsonResponse({'success': True, 'message': message})
+            else:
+                return JsonResponse({'success': False, 'message': message}, status=500)
+                
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse({'error': 'Método não permitido.'}, status=405)
+
+@csrf_exempt
+def generate_signature(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            full_name = data.get('full_name')
+            cargo = data.get('cargo', '')
+            filial = data.get('filial', '9')
+            local = data.get('local', '')
+            telefone = data.get('telefone', '')
+            ramal = data.get('ramal', '')
+            email_manual = data.get('email_manual', '')
+            
+            if not full_name:
+                return JsonResponse({'error': 'Nome é obrigatório.'}, status=400)
+                
+            first_raw, last_raw, _, _ = utils.sanitize_and_extract_names(full_name)
+            signature_name = f"{first_raw} {last_raw}"
+            
+            assinaturas_dir = os.path.join(BASE_DIR, 'register', 'static', 'signatures')
+            os.makedirs(assinaturas_dir, exist_ok=True)
+            
+            generated_path = assinatura.criar_assinatura(
+                nome_param=signature_name,
+                cargo_param=cargo,
+                filial_param=filial,
+                local_param=local,
+                telefone_filial_param='',
+                email_manual_param=email_manual,
+                telefone_param=telefone,
+                ramal_param=ramal,
+                email_param=''
+            )
+            
+            # Formatar nome do arquivo com timestamp para não conflitar
+            import time
+            timestamp = int(time.time())
+            image_name = f"assinatura_avulsa_{first_raw.lower()}_{timestamp}.png"
+            final_image_path = os.path.join(assinaturas_dir, image_name)
+            
+            if os.path.exists(generated_path):
+                import shutil
+                shutil.copy(generated_path, final_image_path)
+            else:
+                return JsonResponse({'error': 'Falha ao gerar a imagem da assinatura.'}, status=500)
+            
+            image_url = f"/static/signatures/{image_name}"
+            
+            return JsonResponse({
+                'success': True,
+                'signature_url': image_url
+            })
+            
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse({'error': 'Método não permitido.'}, status=405)

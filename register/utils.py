@@ -388,3 +388,75 @@ def remove_all_licenses(access_token, user_email):
             
     except Exception as e:
         return False, str(e)
+
+import re
+
+def sanitize_filename(name):
+    """Remove caracteres inválidos para nomes de arquivos no Windows/OneDrive."""
+    if not name:
+        return "Sem_Assunto"
+    return re.sub(r'[\\/*?:"<>|]', "", name).strip()
+
+def backup_outlook_to_onedrive(access_token, source_email, dest_email):
+    """Faz o download dos emails e sobe como .eml na pasta Backups/Nome/Outlook do OneDrive."""
+    if access_token == "mock_token":
+        return True, "Mock: Backup do Outlook concluído (0 emails)."
+        
+    headers = {"Authorization": f"Bearer {access_token}"}
+    
+    try:
+        # 1. Obter ou criar pastas no destino
+        safe_name = source_email.split('@')[0]
+        backup_folder_id = get_or_create_folder(access_token, dest_email, "Backups")
+        if not backup_folder_id:
+            return False, "Erro ao acessar/criar pasta Backups."
+            
+        user_backup_folder_id = get_or_create_folder(access_token, dest_email, safe_name, parent_id=backup_folder_id)
+        outlook_folder_id = get_or_create_folder(access_token, dest_email, "Outlook_Backup", parent_id=user_backup_folder_id)
+        
+        # Obter driveId do destino
+        res_dest_drive = requests.get(f"https://graph.microsoft.com/v1.0/users/{dest_email}/drive", headers=headers)
+        if res_dest_drive.status_code != 200:
+            return False, "Erro ao acessar OneDrive destino."
+        dest_drive_id = res_dest_drive.json().get("id")
+
+        # 2. Loop pelas mensagens (paginado)
+        # top=50 para um compromisso de velocidade e estabilidade
+        url_messages = f"https://graph.microsoft.com/v1.0/users/{source_email}/messages?$select=id,subject&$top=50"
+        messages_copied = 0
+        
+        while url_messages and messages_copied < 200: # hard limit safety net (200 emails no max por timeout web)
+            res_msgs = requests.get(url_messages, headers=headers)
+            if res_msgs.status_code != 200:
+                if messages_copied == 0:
+                    return False, f"Falha ao ler emails. Erro Graph ({res_msgs.status_code}): {res_msgs.text}"
+                break
+                
+            data_msgs = res_msgs.json()
+            messages = data_msgs.get("value", [])
+            
+            for msg in messages:
+                msg_id = msg.get("id")
+                subject = sanitize_filename(msg.get("subject", "Email"))
+                
+                # Baixa o conteúdo MIME
+                res_eml = requests.get(f"https://graph.microsoft.com/v1.0/users/{source_email}/messages/{msg_id}/$value", headers=headers)
+                if res_eml.status_code == 200:
+                    eml_content = res_eml.content
+                    
+                    # Upload para o OneDrive (Direct upload < 4MB)
+                    # Caso exceda, falhará esse email especifico por enquanto
+                    upload_url = f"https://graph.microsoft.com/v1.0/drives/{dest_drive_id}/items/{outlook_folder_id}:/{subject}_{msg_id[-5:]}.eml:/content"
+                    headers_upload = headers.copy()
+                    headers_upload["Content-Type"] = "message/rfc822"
+                    
+                    res_up = requests.put(upload_url, headers=headers_upload, data=eml_content)
+                    if res_up.status_code in [200, 201]:
+                        messages_copied += 1
+                        
+            url_messages = data_msgs.get("@odata.nextLink")
+            
+        return True, f"Backup Outlook finalizado. {messages_copied} e-mails baixados em .eml."
+        
+    except Exception as e:
+        return False, f"Erro Outlook: {str(e)}"

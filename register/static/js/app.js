@@ -175,23 +175,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     tabBtns.forEach(btn => {
         btn.addEventListener('click', () => {
-            // Remove active style from all tabs
+            // Remove active class from all tabs
             tabBtns.forEach(b => {
                 b.classList.remove('active');
-                b.style.background = 'transparent';
-                b.style.color = 'var(--text-color)';
-                b.style.border = '1px solid var(--border-color)';
             });
             // Hide all flows
             flowContainers.forEach(flow => {
                 flow.style.display = 'none';
             });
 
-            // Set active style to clicked tab
+            // Set active class to clicked tab
             btn.classList.add('active');
-            btn.style.background = 'var(--primary-color)';
-            btn.style.color = 'white';
-            btn.style.border = 'none';
 
             // Show selected flow
             const targetId = btn.getAttribute('data-target');
@@ -225,16 +219,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const destEmail = document.getElementById('dest_email').value.trim();
 
             try {
+                // 1. Iniciar Backup do OneDrive
                 const res = await fetch('/api/backup_onedrive', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ source_email: sourceEmail, dest_email: destEmail })
                 });
                 const data = await res.json();
+                
+                let onedriveSuccess = data.success;
 
                 backupMsg.classList.remove('hidden');
-                if (data.success) {
-                    backupMsg.textContent = data.message || "Backup iniciado com sucesso!";
+                if (onedriveSuccess) {
+                    backupMsg.textContent = data.message || "Backup do OneDrive iniciado!";
                     backupMsg.style.backgroundColor = "rgba(78, 173, 64, 0.2)";
                     backupMsg.style.color = "#4EAD40";
                     backupForm.reset();
@@ -243,7 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         startProgressPolling(data.monitor_urls);
                     }
                 } else {
-                    backupMsg.textContent = data.message || data.error || "Erro ao iniciar o backup.";
+                    backupMsg.textContent = data.message || data.error || "Erro ao iniciar o backup do OneDrive.";
                     backupMsg.style.backgroundColor = "rgba(231, 76, 60, 0.2)";
                     backupMsg.style.color = "#E74C3C";
                 }
@@ -312,7 +309,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnRemoveYes && btnRemoveNo) {
         btnRemoveYes.addEventListener('click', async () => {
             licenseMsg.classList.add('hidden');
-            const sourceEmail = document.getElementById('source_email').value.trim();
+            const sourceEmail = document.getElementById('source_email') ? document.getElementById('source_email').value.trim() : "";
             btnRemoveYes.textContent = 'Removendo...';
             btnRemoveYes.disabled = true;
             btnRemoveNo.disabled = true;
@@ -351,6 +348,136 @@ document.addEventListener('DOMContentLoaded', () => {
         btnRemoveNo.addEventListener('click', () => {
             document.getElementById('post-backup-actions').classList.add('hidden');
             backupForm.reset();
+        });
+    }
+
+    // Formulário do Outlook
+    const outlookForm = document.getElementById('outlook-form');
+    const btnOutlook = document.getElementById('btn-outlook');
+    const outlookMsg = document.getElementById('outlook-msg');
+
+    if (outlookForm) {
+        outlookForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            outlookMsg.classList.add('hidden');
+            outlookMsg.textContent = '';
+            
+            setLoading(btnOutlook, true);
+
+            const sourceEmail = document.getElementById('source-email-out').value.trim();
+            const destEmail = document.getElementById('dest-email-out').value.trim();
+
+            outlookMsg.classList.remove('hidden');
+            outlookMsg.textContent = "Baixando e-mails do Outlook, por favor aguarde (pode demorar vários minutos)...";
+            outlookMsg.style.color = "white";
+            outlookMsg.style.backgroundColor = "rgba(255,255,255,0.1)";
+
+            try {
+                const resOut = await fetch('/api/backup_outlook', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ source_email: sourceEmail, dest_email: destEmail })
+                });
+                const dataOut = await resOut.json();
+                
+                if (dataOut.success) {
+                    outlookMsg.style.backgroundColor = "rgba(78, 173, 64, 0.2)";
+                    outlookMsg.style.color = "#4EAD40";
+                    outlookMsg.textContent = dataOut.message;
+                    outlookForm.reset();
+                } else {
+                    outlookMsg.style.backgroundColor = "rgba(231, 76, 60, 0.2)";
+                    outlookMsg.style.color = "#E74C3C";
+                    outlookMsg.textContent = dataOut.message || "Erro no backup do Outlook";
+                }
+            } catch (errOut) {
+                outlookMsg.style.backgroundColor = "rgba(231, 76, 60, 0.2)";
+                outlookMsg.style.color = "#E74C3C";
+                outlookMsg.textContent = "Falha de rede ao realizar backup do Outlook.";
+            } finally {
+                setLoading(btnOutlook, false);
+            }
+        });
+    }
+
+    // Formulário de Assinatura Avulsa
+    const signatureForm = document.getElementById('signature-form');
+    const btnSignature = document.getElementById('btn-signature');
+    const signatureMsg = document.getElementById('signature-msg');
+    const signatureResult = document.getElementById('signature-result');
+    const signatureImage = document.getElementById('signature-image');
+    const btnDownloadSignature = document.getElementById('btn-download-signature');
+    
+    const sigLocalSelect = document.getElementById('sig-local');
+    const sigCustomLocalGroup = document.getElementById('sig-custom-local-group');
+    const sigCustomLocalInput = document.getElementById('sig-custom-local');
+
+    if (sigLocalSelect) {
+        sigLocalSelect.addEventListener('change', (e) => {
+            if (e.target.value === 'Outro') {
+                sigCustomLocalGroup.classList.remove('hidden');
+                sigCustomLocalInput.setAttribute('required', 'true');
+            } else {
+                sigCustomLocalGroup.classList.add('hidden');
+                sigCustomLocalInput.removeAttribute('required');
+            }
+        });
+    }
+
+    if (signatureForm) {
+        signatureForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            signatureMsg.classList.add('hidden');
+            signatureResult.classList.add('hidden');
+            
+            setLoading(btnSignature, true);
+
+            let sigLocal = sigLocalSelect.value;
+            if (sigLocal === 'Outro') {
+                sigLocal = sigCustomLocalInput.value.trim();
+            }
+
+            const payload = {
+                full_name: document.getElementById('sig-name').value.trim(),
+                cargo: document.getElementById('sig-cargo').value.trim(),
+                filial: '9',
+                local: sigLocal,
+                telefone: document.getElementById('sig-telefone').value.trim(),
+                ramal: document.getElementById('sig-ramal').value.trim(),
+                email_manual: document.getElementById('sig-email').value.trim()
+            };
+
+            try {
+                const res = await fetch('/api/generate_signature', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    // Adiciona um cache buster pra imagem sempre recarregar se gerar duas com o mesmo nome
+                    signatureImage.src = data.signature_url + "?v=" + new Date().getTime();
+                    btnDownloadSignature.href = data.signature_url;
+                    signatureResult.classList.remove('hidden');
+                    signatureForm.reset();
+                    sigCustomLocalGroup.classList.add('hidden');
+                } else {
+                    signatureMsg.classList.remove('hidden');
+                    signatureMsg.style.backgroundColor = "rgba(231, 76, 60, 0.2)";
+                    signatureMsg.style.color = "#E74C3C";
+                    signatureMsg.textContent = data.message || data.error || "Erro ao gerar a assinatura.";
+                }
+            } catch (err) {
+                signatureMsg.classList.remove('hidden');
+                signatureMsg.style.backgroundColor = "rgba(231, 76, 60, 0.2)";
+                signatureMsg.style.color = "#E74C3C";
+                signatureMsg.textContent = "Falha de rede ao se comunicar com o servidor.";
+            } finally {
+                setLoading(btnSignature, false);
+            }
         });
     }
 });
