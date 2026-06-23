@@ -275,11 +275,19 @@ def copy_onedrive_items(access_token, source_email, dest_email):
 
         # 5. Listar arquivos e pastas na raiz do usuário de origem
         source_items_url = f"https://graph.microsoft.com/v1.0/users/{source_email}/drive/root/children"
-        res_items = requests.get(source_items_url, headers=headers)
-        if res_items.status_code != 200:
-            return False, f"Erro ao listar itens da origem: {res_items.text}"
+        items = []
+        
+        while source_items_url:
+            res_items = requests.get(source_items_url, headers=headers)
+            if res_items.status_code != 200:
+                return False, f"Erro ao listar itens da origem: {res_items.text}"
+                
+            data_items = res_items.json()
+            items.extend(data_items.get("value", []))
             
-        items = res_items.json().get("value", [])
+            # Checar se há mais páginas de arquivos na raiz
+            source_items_url = data_items.get("@odata.nextLink")
+            
         if not items:
             return True, "O OneDrive de origem está vazio. Nenhuma cópia necessária."
             
