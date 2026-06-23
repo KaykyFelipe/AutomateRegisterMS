@@ -355,12 +355,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const outlookForm = document.getElementById('outlook-form');
     const btnOutlook = document.getElementById('btn-outlook');
     const outlookMsg = document.getElementById('outlook-msg');
+    const outlookProgContainer = document.getElementById('outlook-progress-container');
+    const outlookProgBar = document.getElementById('outlook-progress-bar');
+    const outlookProgText = document.getElementById('outlook-progress-text');
 
     if (outlookForm) {
         outlookForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             
             outlookMsg.classList.add('hidden');
+            outlookProgContainer.classList.add('hidden');
             outlookMsg.textContent = '';
             
             setLoading(btnOutlook, true);
@@ -370,8 +374,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
             outlookMsg.classList.remove('hidden');
             outlookMsg.textContent = "Baixando e-mails do Outlook, por favor aguarde (pode demorar vários minutos)...";
-            outlookMsg.style.color = "white";
-            outlookMsg.style.backgroundColor = "rgba(255,255,255,0.1)";
+            outlookMsg.style.color = "var(--text-main)";
+            outlookMsg.style.backgroundColor = "transparent";
+            
+            // Simular progresso enquanto a chamada síncrona roda no backend
+            outlookProgContainer.classList.remove('hidden');
+            let pct = 0;
+            outlookProgBar.style.width = '0%';
+            outlookProgText.textContent = '0%';
+            const progressInterval = setInterval(() => {
+                if (pct < 95) {
+                    pct += Math.floor(Math.random() * 3) + 1;
+                    if (pct > 95) pct = 95;
+                    outlookProgBar.style.width = pct + '%';
+                    outlookProgText.textContent = pct + '%';
+                }
+            }, 1000);
 
             try {
                 const resOut = await fetch('/api/backup_outlook', {
@@ -381,17 +399,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 const dataOut = await resOut.json();
                 
+                clearInterval(progressInterval);
+                
                 if (dataOut.success) {
+                    outlookProgBar.style.width = '100%';
+                    outlookProgText.textContent = '100%';
                     outlookMsg.style.backgroundColor = "rgba(78, 173, 64, 0.2)";
                     outlookMsg.style.color = "#4EAD40";
                     outlookMsg.textContent = dataOut.message;
                     outlookForm.reset();
                 } else {
+                    outlookProgContainer.classList.add('hidden');
                     outlookMsg.style.backgroundColor = "rgba(231, 76, 60, 0.2)";
                     outlookMsg.style.color = "#E74C3C";
                     outlookMsg.textContent = dataOut.message || "Erro no backup do Outlook";
                 }
             } catch (errOut) {
+                clearInterval(progressInterval);
+                outlookProgContainer.classList.add('hidden');
                 outlookMsg.style.backgroundColor = "rgba(231, 76, 60, 0.2)";
                 outlookMsg.style.color = "#E74C3C";
                 outlookMsg.textContent = "Falha de rede ao realizar backup do Outlook.";

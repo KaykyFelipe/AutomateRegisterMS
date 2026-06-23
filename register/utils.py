@@ -425,7 +425,7 @@ def backup_outlook_to_onedrive(access_token, source_email, dest_email):
         url_messages = f"https://graph.microsoft.com/v1.0/users/{source_email}/messages?$select=id,subject&$top=50"
         messages_copied = 0
         
-        while url_messages and messages_copied < 200: # hard limit safety net (200 emails no max por timeout web)
+        while url_messages and messages_copied < 30000: # Limite de segurança bastante alto (20.000 emails)
             res_msgs = requests.get(url_messages, headers=headers)
             if res_msgs.status_code != 200:
                 if messages_copied == 0:
