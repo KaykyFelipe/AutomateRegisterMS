@@ -428,41 +428,80 @@ def backup_outlook_to_onedrive(access_token, source_email, dest_email):
             return False, "Erro ao acessar OneDrive destino."
         dest_drive_id = res_dest_drive.json().get("id")
 
-        # 2. Loop pelas mensagens (paginado)
-        # top=50 para um compromisso de velocidade e estabilidade
-        url_messages = f"https://graph.microsoft.com/v1.0/users/{source_email}/messages?$select=id,subject&$top=50"
-        messages_copied = 0
+        # 2. Iterar por todas as pastas de email (raiz e filhas) usando uma fila
+        folders_queue = []
+        url_root_folders = f"https://graph.microsoft.com/v1.0/users/{source_email}/mailFolders?$top=250"
         
-        while url_messages and messages_copied < 30000: # Limite de segurança bastante alto (20.000 emails)
-            res_msgs = requests.get(url_messages, headers=headers)
-            if res_msgs.status_code != 200:
-                if messages_copied == 0:
-                    return False, f"Falha ao ler emails. Erro Graph ({res_msgs.status_code}): {res_msgs.text}"
+        while url_root_folders:
+            res_rf = requests.get(url_root_folders, headers=headers)
+            if res_rf.status_code == 200:
+                data_rf = res_rf.json()
+                for rf in data_rf.get("value", []):
+                    folders_queue.append({
+                        "id": rf.get("id"),
+                        "name": rf.get("displayName", "Pasta"),
+                        "onedrive_parent_id": outlook_folder_id
+                    })
+                url_root_folders = data_rf.get("@odata.nextLink")
+            else:
                 break
                 
-            data_msgs = res_msgs.json()
-            messages = data_msgs.get("value", [])
+        messages_copied = 0
+        
+        while folders_queue and messages_copied < 30000:
+            current_folder = folders_queue.pop(0)
+            folder_id = current_folder["id"]
+            folder_name = sanitize_filename(current_folder["name"])
+            onedrive_parent_id = current_folder["onedrive_parent_id"]
             
-            for msg in messages:
-                msg_id = msg.get("id")
-                subject = sanitize_filename(msg.get("subject", "Email"))
+            # Criar a pasta no OneDrive refletindo a estrutura do Outlook
+            current_onedrive_folder_id = get_or_create_folder(access_token, dest_email, folder_name, parent_id=onedrive_parent_id)
+            if not current_onedrive_folder_id:
+                current_onedrive_folder_id = onedrive_parent_id # Fallback se falhar
                 
-                # Baixa o conteúdo MIME
-                res_eml = requests.get(f"https://graph.microsoft.com/v1.0/users/{source_email}/messages/{msg_id}/$value", headers=headers)
-                if res_eml.status_code == 200:
-                    eml_content = res_eml.content
+            # Buscar subpastas desta pasta e adicionar à fila
+            url_subfolders = f"https://graph.microsoft.com/v1.0/users/{source_email}/mailFolders/{folder_id}/childFolders?$top=250"
+            while url_subfolders:
+                res_sf = requests.get(url_subfolders, headers=headers)
+                if res_sf.status_code == 200:
+                    data_sf = res_sf.json()
+                    for sf in data_sf.get("value", []):
+                        folders_queue.append({
+                            "id": sf.get("id"),
+                            "name": sf.get("displayName", "Subpasta"),
+                            "onedrive_parent_id": current_onedrive_folder_id
+                        })
+                    url_subfolders = data_sf.get("@odata.nextLink")
+                else:
+                    break
                     
-                    # Upload para o OneDrive (Direct upload < 4MB)
-                    # Caso exceda, falhará esse email especifico por enquanto
-                    upload_url = f"https://graph.microsoft.com/v1.0/drives/{dest_drive_id}/items/{outlook_folder_id}:/{subject}_{msg_id[-5:]}.eml:/content"
-                    headers_upload = headers.copy()
-                    headers_upload["Content-Type"] = "message/rfc822"
+            # Buscar mensagens desta pasta
+            url_messages = f"https://graph.microsoft.com/v1.0/users/{source_email}/mailFolders/{folder_id}/messages?$select=id,subject&$top=50"
+            while url_messages and messages_copied < 30000:
+                res_msgs = requests.get(url_messages, headers=headers)
+                if res_msgs.status_code != 200:
+                    break
                     
-                    res_up = requests.put(upload_url, headers=headers_upload, data=eml_content)
-                    if res_up.status_code in [200, 201]:
-                        messages_copied += 1
+                data_msgs = res_msgs.json()
+                messages = data_msgs.get("value", [])
+                
+                for msg in messages:
+                    msg_id = msg.get("id")
+                    subject = sanitize_filename(msg.get("subject", "Email"))
+                    
+                    # Baixar o conteúdo MIME do email
+                    res_eml = requests.get(f"https://graph.microsoft.com/v1.0/users/{source_email}/messages/{msg_id}/$value", headers=headers)
+                    if res_eml.status_code == 200:
+                        eml_content = res_eml.content
+                        upload_url = f"https://graph.microsoft.com/v1.0/drives/{dest_drive_id}/items/{current_onedrive_folder_id}:/{subject}_{msg_id[-5:]}.eml:/content"
+                        headers_upload = headers.copy()
+                        headers_upload["Content-Type"] = "message/rfc822"
                         
-            url_messages = data_msgs.get("@odata.nextLink")
+                        res_up = requests.put(upload_url, headers=headers_upload, data=eml_content)
+                        if res_up.status_code in [200, 201]:
+                            messages_copied += 1
+                            
+                url_messages = data_msgs.get("@odata.nextLink")
             
         return True, f"Backup Outlook finalizado. {messages_copied} e-mails baixados em .eml."
         

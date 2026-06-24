@@ -91,7 +91,7 @@ def criar_assinatura(nome_param=None, cargo_param=None, filial_param=None, local
         cidade = filiais[filial]['local'].split('/')[0]
         uf = filiais[filial]['local'].split('/')[1]
         telefone_filial = filiais[filial]['telefone']
-        email_manual = ""
+        email_manual = email_manual_param if email_manual_param is not None else ""
 
     telefone = telefone_param if telefone_param is not None else input("Qual TELEFONE? (Pressione ENTER para pular) ").strip()
     ramal = ramal_param if ramal_param is not None else input("Qual ramal? (Pressione ENTER para pular) ").strip()
@@ -213,7 +213,7 @@ def criar_assinatura(nome_param=None, cargo_param=None, filial_param=None, local
     # Letter spacing: -3%
     if email_param is not None:
         email_completo = email_param
-    elif filial == '9' and email_manual:
+    elif email_manual and email_manual.strip() != "":
         email_completo = email_manual
     else:
         email_completo = f"{email}@ativalocacao.com.br"

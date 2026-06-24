@@ -243,7 +243,7 @@ def generate_signature(request):
                 email_manual_param=email_manual,
                 telefone_param=telefone,
                 ramal_param=ramal,
-                email_param=''
+                email_param=None
             )
             
             # Formatar nome do arquivo com timestamp para não conflitar
